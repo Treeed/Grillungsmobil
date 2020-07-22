@@ -7,4 +7,5 @@ idf_component_register(SRCS
         "spi_controller.c"
         "analog_reader.c"
         "speed_in.c"
+        "ble_tranceiver.c"
         INCLUDE_DIRS "")

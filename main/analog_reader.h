@@ -7,4 +7,6 @@
 
 void initialize_read_analog();
 
+extern QueueHandle_t analog_value_queue;
+
 #endif //UNTITLED_ANALOG_READER_H

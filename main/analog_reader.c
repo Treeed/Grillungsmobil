@@ -12,6 +12,8 @@
 #include "spi_controller.h"
 #include "error_handler.h"
 
+QueueHandle_t analog_value_queue;
+
 _Noreturn void read_analog_mux(void *pvParameters){
     esp_adc_cal_characteristics_t adc_characteristics;
     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &adc_characteristics);
@@ -35,7 +37,8 @@ _Noreturn void read_analog_mux(void *pvParameters){
         }
         uint32_t avg = sum/avg_no;
 
-        double voltage = avg*4.584+28824; //accurate to within 20mV up to 42 V directly after cal
+        uint32_t voltage = avg*4.584+28824; //accurate to within 20mV up to 42 V directly after cal
+
 
 
         if(voltage < 35000){
@@ -58,6 +61,8 @@ _Noreturn void read_analog_mux(void *pvParameters){
             battery_low_cnt = 0;
         }
 
+        xQueueOverwrite(analog_value_queue, &voltage);
+
         //printf("%f\n", (avg*4.584+28824));
 
         //esp_adc_cal_raw_to_voltage(avg, &adc_characteristics)
@@ -67,6 +72,8 @@ _Noreturn void read_analog_mux(void *pvParameters){
 void initialize_read_analog(){
     adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_3, ADC_ATTEN_DB_11);
+
+    analog_value_queue = xQueueCreate(1, 4);
 
     xTaskCreate(read_analog_mux, "read_analog_mux", 2048, NULL, 10, NULL);
 }
