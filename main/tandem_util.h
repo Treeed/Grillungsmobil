@@ -18,6 +18,7 @@
 int comparefunc (const void * a, const void * b);
 unsigned char reverseBits(unsigned char b);
 int int_from_serial();
+void printBits(size_t const size, void const * const ptr);
 
 
 #endif //UNTITLED_TANDEM_UTIL_H

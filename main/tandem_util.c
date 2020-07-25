@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include <esp32/rom/uart.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "tandem_util.h"
 
@@ -29,4 +30,21 @@ unsigned char reverseBits(unsigned char b) {
 int comparefunc (const void * a, const void * b)
 {
     return ( *(int*)a - *(int*)b );
+}
+
+void printBits(size_t const size, void const * const ptr)
+{
+    unsigned char *b = (unsigned char*) ptr;
+    unsigned char byte;
+    int i, j;
+
+    for (i=size-1;i>=0;i--)
+    {
+        for (j=7;j>=0;j--)
+        {
+            byte = (b[i] >> j) & 1;
+            printf("%u", byte);
+        }
+    }
+    puts("");
 }

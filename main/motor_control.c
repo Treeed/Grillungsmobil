@@ -63,9 +63,9 @@ _Noreturn static void motor_output_duty(__unused void *pvParameters){
         }
 
 
-        printf("%d ", raw_current);
-        printf("%d ", target);
-        printf("%f\n", output_value);
+//        printf("%d ", raw_current);
+//        printf("%d ", target);
+//        printf("%f\n", output_value);
         dac_output_voltage(DAC_CHANNEL_1, (uint8_t) output_value);
     }
 }

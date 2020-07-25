@@ -8,8 +8,10 @@
 #include <driver/spi_master.h>
 #include <freertos/queue.h>
 #include "spi_controller.h"
+#include "tandem_util.h"
 
 spi_device_handle_t shift_out_register_handle;
+spi_device_handle_t shift_in_register_handle;
 QueueHandle_t shift_out_queue;
 
 _Noreturn void shift_out_task(void *pvParameters){
@@ -42,10 +44,30 @@ _Noreturn void shift_out_task(void *pvParameters){
     }
 }
 
+_Noreturn void shift_in_task(void *pvParameters){
+    uint16_t shift_in_buffer;
+    spi_transaction_t shift_in_transaction = {
+            .flags = 0,
+            .cmd = 0,
+            .addr = 0,
+            .length = 16,
+            .rxlength = 16,
+            .user = 0,
+            .tx_buffer = 0,
+            .rx_buffer = &shift_in_buffer
+    };
+    while(1){
+        vTaskDelay(pdMS_TO_TICKS(100));
+        spi_device_polling_transmit(shift_in_register_handle, &shift_in_transaction);
+        printBits(2, &shift_in_buffer);
+        printf("\n");
+    }
+}
+
 void initialize_spi(){
 
     spi_bus_config_t spi_bus_config = {
-        .mosi_io_num = 21,
+        .mosi_io_num = 23,
         .miso_io_num = 19,
         .sclk_io_num = 18,
         .quadwp_io_num = -1,
@@ -64,7 +86,7 @@ void initialize_spi(){
         .mode = 0,
         .duty_cycle_pos = 0,
         .cs_ena_pretrans = 0,
-        .cs_ena_posttrans = 15,
+        .cs_ena_posttrans = 5,
         .clock_speed_hz = 10000000,
         .input_delay_ns = 0,
         .spics_io_num = 2,
@@ -77,7 +99,28 @@ void initialize_spi(){
 
     spi_bus_add_device(SPI2_HOST, &shift_out_register_conf, &shift_out_register_handle);
 
+    spi_device_interface_config_t shift_in_register_conf = {
+            .command_bits = 0,
+            .address_bits = 0,
+            .dummy_bits = 0,
+            .mode = 2,
+            .duty_cycle_pos = 0,
+            .cs_ena_pretrans = 5,
+            .cs_ena_posttrans = 0,
+            .clock_speed_hz = 5000000,
+            .input_delay_ns = 0,
+            .spics_io_num = 22,
+            .flags = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_POSITIVE_CS,
+            .queue_size = 1,
+            .pre_cb = 0,
+            .post_cb = 0
+    };
+
+
+    spi_bus_add_device(SPI2_HOST, &shift_in_register_conf, &shift_in_register_handle);
+
     shift_out_queue = xQueueCreate(10, 8);
     xTaskCreate(shift_out_task, "shift_out_task", 1024, NULL, 10, NULL);
+    xTaskCreate(shift_in_task, "shift_in_task", 2048, NULL, 10, NULL);
 
 }
