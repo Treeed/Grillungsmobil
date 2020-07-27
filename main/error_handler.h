@@ -9,6 +9,7 @@
 
 typedef struct{
     bool torque_error : 1;
+    bool battery_low : 1;
     bool battery_empty : 1;
 } ErrorType; //increase queue size when this becomes > 8 values!
 

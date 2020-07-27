@@ -18,6 +18,7 @@ QueueHandle_t active_errors_queue;
 void kill_motor();
 
 
+
 _Noreturn void error_handler(__unused void *pvParameters){
     ErrorType active_errors = {0};
     xQueueOverwrite(active_errors_queue, &active_errors);
@@ -26,9 +27,16 @@ _Noreturn void error_handler(__unused void *pvParameters){
         ErrorStruct error;
         xQueueReceive(error_queue, &error, portMAX_DELAY);
 
+        printf("%s\n", error.error_msg);
+
         if(error.error_type.torque_error){
             kill_motor();
             active_errors.torque_error = 1;
+            xQueueOverwrite(active_errors_queue, &active_errors);
+        }
+        if(error.error_type.battery_low){
+            kill_motor();
+            active_errors.battery_low = 1;
             xQueueOverwrite(active_errors_queue, &active_errors);
         }
         if(error.error_type.battery_empty){
@@ -37,7 +45,6 @@ _Noreturn void error_handler(__unused void *pvParameters){
             xQueueOverwrite(active_errors_queue, &active_errors);
         }
 
-        printf("%s\n", error.error_msg);
     }
 }
 
