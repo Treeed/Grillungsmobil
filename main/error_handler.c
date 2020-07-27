@@ -10,6 +10,7 @@
 
 #include "error_handler.h"
 #include "motor_control.h"
+#include "spi_controller.h"
 
 
 QueueHandle_t error_queue;
@@ -38,6 +39,16 @@ _Noreturn void error_handler(__unused void *pvParameters){
 
         printf("%s\n", error.error_msg);
     }
+}
+
+void turn_off(){
+    kill_motor();
+    vTaskDelay(pdMS_TO_TICKS(500));
+    ShiftOutActionStruct turn_off_action = {
+            .shift_out_action = SET_FET_ON,
+            .value = 0,
+    };
+    xQueueSend(shift_out_queue, &turn_off_action, 0);
 }
 
 void kill_motor(){

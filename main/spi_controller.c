@@ -10,6 +10,7 @@
 #include <driver/gpio.h>
 #include "spi_controller.h"
 #include "tandem_util.h"
+#include "error_handler.h"
 
 spi_device_handle_t shift_out_register_handle;
 spi_device_handle_t shift_in_register_handle;
@@ -41,6 +42,7 @@ _Noreturn void shift_out_task(void *pvParameters){
     };
 
     shift_out_bits shift_out_value = {
+            .stay_on = 1
     };
 
     while(1){
@@ -53,6 +55,10 @@ _Noreturn void shift_out_task(void *pvParameters){
                 break;
 
             case SET_LED:
+                break;
+
+            case SET_FET_ON:
+                shift_out_value.stay_on = shift_out_action.value;
                 break;
         }
 
@@ -73,6 +79,9 @@ _Noreturn void shift_in_task(void *pvParameters){
             .tx_buffer = 0,
             .rx_buffer = &shift_in_buffer
     };
+
+    TickType_t on_released = xTaskGetTickCount();
+
     while(1){
         vTaskDelay(pdMS_TO_TICKS(100));
 
@@ -82,6 +91,12 @@ _Noreturn void shift_in_task(void *pvParameters){
         gpio_set_level(GPIO_NUM_22, 0);
         spi_device_release_bus(shift_in_register_handle);
 
+        if(!shift_in_buffer.on_button){
+            if((xTaskGetTickCount()-on_released) > pdMS_TO_TICKS(200)){
+                turn_off();
+            }
+            on_released = xTaskGetTickCount();
+        }
 //
 //        printBits(2, &shift_in_buffer);
 //        printf("\n");
@@ -151,7 +166,6 @@ void initialize_spi(){
     gpio_config(&cs_shift_in_conf);
 
     shift_out_queue = xQueueCreate(10, 8);
-    xTaskCreate(shift_out_task, "shift_out_task", 1024, NULL, 10, NULL);
+    xTaskCreate(shift_out_task, "shift_out_task", 1024, NULL, 11, NULL);
     xTaskCreate(shift_in_task, "shift_in_task", 2048, NULL, 10, NULL);
-
 }

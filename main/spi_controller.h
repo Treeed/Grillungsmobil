@@ -8,6 +8,7 @@
 typedef enum{
     SET_ANALOG_MUX,
     SET_LED,
+    SET_FET_ON,
 } ShiftOutAction;
 
 typedef struct {

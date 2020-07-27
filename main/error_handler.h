@@ -23,5 +23,6 @@ extern QueueHandle_t error_queue;
 extern QueueHandle_t active_errors_queue;
 
 void initialize_error_handler();
+void turn_off();
 
 #endif //UNTITLED_ERROR_HANDLER_H
