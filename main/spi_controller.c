@@ -15,6 +15,19 @@ spi_device_handle_t shift_out_register_handle;
 spi_device_handle_t shift_in_register_handle;
 QueueHandle_t shift_out_queue;
 
+typedef struct {
+    bool stay_on : 1;
+    unsigned int unused : 4;
+    unsigned int analog_mux_pin : 3;
+} shift_out_bits;
+
+typedef struct {
+    unsigned int unused1 : 3;
+    bool on_button : 1;
+    unsigned int unused2 : 12;
+} shift_in_bits;
+
+
 _Noreturn void shift_out_task(void *pvParameters){
     spi_transaction_t shift_out_transaction = {
             .flags = 0,
@@ -26,14 +39,17 @@ _Noreturn void shift_out_task(void *pvParameters){
             .tx_buffer = 0,
             .rx_buffer = 0
     };
-    uint8_t shift_out_value = 0b00000000;
+
+    shift_out_bits shift_out_value = {
+    };
+
     while(1){
         ShiftOutActionStruct shift_out_action;
         xQueueReceive(shift_out_queue, &shift_out_action, portMAX_DELAY);
 
         switch (shift_out_action.shift_out_action) {
             case SET_ANALOG_MUX:
-                shift_out_value = (shift_out_value & 0b00011111) | shift_out_action.value << 5;
+                shift_out_value.analog_mux_pin = shift_out_action.value;
                 break;
 
             case SET_LED:
@@ -46,7 +62,7 @@ _Noreturn void shift_out_task(void *pvParameters){
 }
 
 _Noreturn void shift_in_task(void *pvParameters){
-    uint16_t shift_in_buffer;
+    shift_in_bits shift_in_buffer;
     spi_transaction_t shift_in_transaction = {
             .flags = 0,
             .cmd = 0,
