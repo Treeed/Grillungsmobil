@@ -7,6 +7,7 @@
 #include <driver/spi_common.h>
 #include <driver/spi_master.h>
 #include <freertos/queue.h>
+#include <driver/gpio.h>
 #include "spi_controller.h"
 #include "tandem_util.h"
 
@@ -58,9 +59,16 @@ _Noreturn void shift_in_task(void *pvParameters){
     };
     while(1){
         vTaskDelay(pdMS_TO_TICKS(100));
+
+        spi_device_acquire_bus(shift_in_register_handle, portMAX_DELAY);
+        gpio_set_level(GPIO_NUM_22, 1);
         spi_device_polling_transmit(shift_in_register_handle, &shift_in_transaction);
-        printBits(2, &shift_in_buffer);
-        printf("\n");
+        gpio_set_level(GPIO_NUM_22, 0);
+        spi_device_release_bus(shift_in_register_handle);
+
+//
+//        printBits(2, &shift_in_buffer);
+//        printf("\n");
     }
 }
 
@@ -98,26 +106,33 @@ void initialize_spi(){
 
 
     spi_bus_add_device(SPI2_HOST, &shift_out_register_conf, &shift_out_register_handle);
-
     spi_device_interface_config_t shift_in_register_conf = {
             .command_bits = 0,
             .address_bits = 0,
             .dummy_bits = 0,
             .mode = 2,
             .duty_cycle_pos = 0,
-            .cs_ena_pretrans = 5,
+            .cs_ena_pretrans = 0,
             .cs_ena_posttrans = 0,
             .clock_speed_hz = 5000000,
             .input_delay_ns = 0,
-            .spics_io_num = 22,
-            .flags = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_POSITIVE_CS,
+            .spics_io_num = -1,
+            .flags = SPI_DEVICE_HALFDUPLEX,
             .queue_size = 1,
             .pre_cb = 0,
             .post_cb = 0
     };
 
-
     spi_bus_add_device(SPI2_HOST, &shift_in_register_conf, &shift_in_register_handle);
+
+    gpio_config_t cs_shift_in_conf = {
+            .pin_bit_mask = 1<<22,
+            .mode = GPIO_MODE_OUTPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&cs_shift_in_conf);
 
     shift_out_queue = xQueueCreate(10, 8);
     xTaskCreate(shift_out_task, "shift_out_task", 1024, NULL, 10, NULL);
