@@ -8,6 +8,7 @@
 #include <driver/spi_master.h>
 #include <freertos/queue.h>
 #include <driver/gpio.h>
+#include <string.h>
 #include "spi_controller.h"
 #include "tandem_util.h"
 #include "error_handler.h"
@@ -25,7 +26,9 @@ typedef struct {
 typedef struct {
     unsigned int unused1 : 3;
     bool on_button : 1;
-    unsigned int unused2 : 12;
+    unsigned int unused2 : 6;
+    uint8_t check_bits : 2;
+    unsigned int unused3 : 4;
 } shift_in_bits;
 
 
@@ -82,6 +85,8 @@ _Noreturn void shift_in_task(void *pvParameters){
 
     TickType_t on_released = xTaskGetTickCount();
 
+    int consecutive_shift_in_errors = 0;
+
     while(1){
         vTaskDelay(pdMS_TO_TICKS(100));
 
@@ -91,15 +96,36 @@ _Noreturn void shift_in_task(void *pvParameters){
         gpio_set_level(GPIO_NUM_22, 0);
         spi_device_release_bus(shift_in_register_handle);
 
+        if(shift_in_buffer.check_bits != 0b01){
+            consecutive_shift_in_errors += 1;
+            if(consecutive_shift_in_errors > 1){
+                ErrorType active_errors;
+                xQueuePeek(active_errors_queue, &active_errors, portMAX_DELAY);
+                if(!active_errors.shift_in_error) {
+                    ErrorType error_type = {0};
+                    error_type.shift_in_error = 1;
+                    ErrorStruct error = {
+                            .error_type = error_type,
+                            .error_msg = "shift in check bits were damaged thrice. received"
+                    };
+                    strcat(error.error_msg, binString( *((uint16_t *) &shift_in_buffer)));
+
+                    xQueueSend(error_queue, &error, 0);
+                }
+            }
+            continue;
+        } else{
+            consecutive_shift_in_errors = 0;
+        }
+
         if(!shift_in_buffer.on_button){
             if((xTaskGetTickCount()-on_released) > pdMS_TO_TICKS(200)){
+                printf("button pushed, turning off! shift in was ");
+                printBits(2, &shift_in_buffer);
                 turn_off();
             }
             on_released = xTaskGetTickCount();
         }
-//
-//        printBits(2, &shift_in_buffer);
-//        printf("\n");
     }
 }
 

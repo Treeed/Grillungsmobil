@@ -40,8 +40,13 @@ _Noreturn void error_handler(__unused void *pvParameters){
             xQueueOverwrite(active_errors_queue, &active_errors);
         }
         if(error.error_type.battery_empty){
-            kill_motor();
+            turn_off();
             active_errors.battery_empty = 1;
+            xQueueOverwrite(active_errors_queue, &active_errors);
+        }
+        if(error.error_type.shift_in_error){
+            turn_off();
+            active_errors.shift_in_error = 1;
             xQueueOverwrite(active_errors_queue, &active_errors);
         }
 
