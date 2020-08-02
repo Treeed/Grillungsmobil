@@ -13,6 +13,6 @@ void app_main() {
     initialize_spi();
     initialize_read_analog();
     initialize_speed_in();
-    initialize_ble();
+    //initialize_ble();
 }
 
