@@ -19,7 +19,10 @@ QueueHandle_t shift_out_queue;
 
 typedef struct {
     bool stay_on : 1;
-    unsigned int unused : 4;
+    bool beeper : 1;
+    bool led_blue : 1;
+    bool led_green : 1;
+    bool led_red : 1;
     unsigned int analog_mux_pin : 3;
 } shift_out_bits;
 
@@ -45,7 +48,10 @@ _Noreturn void shift_out_task(void *pvParameters){
     };
 
     shift_out_bits shift_out_value = {
-            .stay_on = 1
+            .stay_on = 1,
+            .led_red = 1,
+            .led_green = 1,
+            .led_blue = 1
     };
 
     while(1){
