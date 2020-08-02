@@ -21,23 +21,16 @@ TaskHandle_t motor_task;
 void invoke_torque_error();
 
 uint32_t get_current();
+void regulate_current(uint32_t target);
+double calc_amps(uint32_t raw_current);
 
 _Noreturn static void motor_output_duty(__unused void *pvParameters){
     dac_output_enable(DAC_CHANNEL_1);
-    const int no_init_samples = 100;
-    const int init_time_ms = 2000;
-    uint32_t sum = 0;
-
-    TickType_t start_time = xTaskGetTickCount();
-    for(int sample_no = 0; sample_no < no_init_samples; sample_no++){
-        sum += get_current();
-        vTaskDelayUntil(&start_time, pdMS_TO_TICKS(init_time_ms/no_init_samples));
-    }
-    uint32_t current_offset = sum / no_init_samples;
+    vTaskDelay(pdMS_TO_TICKS(500));
 
 
-    int last_error = 0;
-    double output_value = 0;
+    float target_current = 0;
+
     TickType_t last_torque = 0;
     while(1){
         int32_t torque_value;
@@ -48,27 +41,72 @@ _Noreturn static void motor_output_duty(__unused void *pvParameters){
             invoke_torque_error();
         }
 
-        int target = (torque_value-5)*20;
-
-        int raw_current = get_current();
-        raw_current = MAX(raw_current - (int) current_offset, 0);
-        int error_value = target-raw_current;
-
-        if(target > 0) {
-            output_value = MIN(255, MAX(5, (
-                    output_value + error_value * 0.001 + (error_value - last_error) * 0
-            )));
-        } else{
-            output_value = 0;
-        }
 
 
-//        printf("%d ", raw_current);
+//        int target = (torque_value-15)*35;
+//
 //        printf("%d ", target);
-//        printf("%f\n", output_value);
-        dac_output_voltage(DAC_CHANNEL_1, (uint8_t) output_value);
+//
+//        float error_value = (float) target-target_current;
+//
+//        if(target > 0) {
+//            target_current = MIN(4000, MAX(-1, (
+//                    target_current + error_value * 0.0005
+//            )));
+//        } else{
+//            target_current = -1;
+//        }
+
+        int target;
+        if(gpio_input_get() & 0b1) {
+            target = 0;
+        } else{
+            target = 6000;
+        }
+        regulate_current(target);
+
+
+
     }
 }
+
+
+void regulate_current(uint32_t target){
+    //ziegler nichols: schwingt bei Kp = 0.015
+    //periode 70 zyklen
+    //kp=0.00675 tn = 59.5 Ki =0.000113
+
+    //ziegler nichols: schwingt bei Kp = 0.006
+    //periode 17 zyklen
+    //kp=0.0027 tn = 14.45 Ki = 0.000187
+
+    static double i = 0;
+    double output_value;
+
+    double raw_current = calc_amps(get_current());
+    double error_value = target-raw_current;
+
+    double p = error_value * 0.001;
+    i = MIN(255, MAX(5, error_value * 0.0001 + i));
+
+    if(target > 0) {
+        output_value = MIN(255, MAX(5, p+i));
+    } else{
+        output_value = 0;
+    }
+
+    printf("p:%f ", p);
+    printf("i:%f ", i);
+    printf("cur:%f ", raw_current/30);
+    printf("target:%d ", target/30);
+    printf("out:%d\n", (uint8_t) output_value);
+    dac_output_voltage(DAC_CHANNEL_1, (uint8_t) output_value);
+}
+
+double calc_amps(uint32_t raw_current){
+    return (double)raw_current*5.33 + 154.84;
+}
+
 
 uint32_t get_current() {
     const int sampleLen = 20;
@@ -121,14 +159,14 @@ void initialize_motor_control(){
     adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_0);
 
     //debug input
-//    gpio_config_t in0_config  = {
-//            .pin_bit_mask = 0b1,
-//            .mode = GPIO_MODE_INPUT,
-//            .pull_up_en = GPIO_PULLUP_DISABLE,
-//            .pull_down_en = GPIO_PULLDOWN_DISABLE,
-//            .intr_type = GPIO_INTR_DISABLE
-//    };
-//    gpio_config(&in0_config);
+    gpio_config_t in0_config  = {
+            .pin_bit_mask = 0b1,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&in0_config);
 
     //for debugging, do not use with motor_output_duty
     //xTaskCreate(motor_duty_from_serial, "duty_from_serial", 2048, NULL, 13, NULL);
