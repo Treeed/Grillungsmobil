@@ -69,6 +69,9 @@ _Noreturn void shift_out_task(void *pvParameters){
             case SET_FET_ON:
                 shift_out_value.stay_on = shift_out_action.value;
                 break;
+
+            case SET_BEEP_ON:
+                shift_out_value.beeper = shift_out_action.value;
         }
 
         shift_out_transaction.tx_buffer = &shift_out_value;

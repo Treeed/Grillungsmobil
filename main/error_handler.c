@@ -55,7 +55,14 @@ _Noreturn void error_handler(__unused void *pvParameters){
 
 void turn_off(){
     kill_motor();
+    ShiftOutActionStruct beep_action = {
+            .shift_out_action = SET_BEEP_ON,
+            .value = 1,
+    };
+    xQueueSend(shift_out_queue, &beep_action, 0);
+
     vTaskDelay(pdMS_TO_TICKS(500));
+
     ShiftOutActionStruct turn_off_action = {
             .shift_out_action = SET_FET_ON,
             .value = 0,
