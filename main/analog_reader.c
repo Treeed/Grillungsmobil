@@ -73,10 +73,10 @@ _Noreturn void read_analog_mux(void *pvParameters){
                 xQueueSend(error_queue, &error, 0);
             }
         }
-        printf("%u bat volt \n", bat_voltage);
-//        printf("%fC ",esc_temp);
-//        printf("%fC ",buck_temp);
-//        printf("%fC\n",motor_temp);
+//        printf("bat:%f ", (float) bat_voltage/1000);
+//        printf("esc:%f ",esc_temp);
+//        printf("buck:%f ",buck_temp);
+//        printf("motor:%f\n",motor_temp);
 
         xQueueOverwrite(analog_value_queue, &bat_voltage);
 
