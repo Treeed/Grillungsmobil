@@ -125,7 +125,7 @@ void check_battery_voltage(uint32_t voltage_mv){
     static int battery_low_cnt = 0;
     static int battery_empty_cnt = 0;
 
-    if(voltage_mv < 33000){
+    if(voltage_mv < 32000){
         battery_low_cnt++;
         if(battery_low_cnt > 30) {
 
