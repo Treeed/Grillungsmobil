@@ -21,7 +21,7 @@ TaskHandle_t motor_task;
 void invoke_torque_error();
 
 uint32_t get_current();
-void regulate_current(uint32_t target);
+void regulate_current(int32_t target);
 double calc_amps(uint32_t raw_current);
 
 _Noreturn static void motor_output_duty(__unused void *pvParameters){
@@ -29,12 +29,17 @@ _Noreturn static void motor_output_duty(__unused void *pvParameters){
     vTaskDelay(pdMS_TO_TICKS(500));
 
 
-    float target_current = 0;
 
     TickType_t last_torque = 0;
+    #define torque_values_size 100
+    int32_t torque_values[torque_values_size] = {0};
+    uint16_t current_torque_pos = 0;
+    int32_t target_current = 0;
+
+    TickType_t loop_start = xTaskGetTickCount();
     while(1){
-        int32_t torque_value;
-        if(xQueueReceive(torque_value_queue, &torque_value, 0) == pdTRUE){
+        if(xQueueReceive(torque_value_queue, &(torque_values[(current_torque_pos + 1) % torque_values_size]), 0) == pdTRUE){
+            current_torque_pos = (current_torque_pos + 1) % torque_values_size;
             last_torque = xTaskGetTickCount();
         }
         if(xTaskGetTickCount() - last_torque > pdMS_TO_TICKS(100)){
@@ -42,36 +47,39 @@ _Noreturn static void motor_output_duty(__unused void *pvParameters){
         }
 
 
+        if(torque_values[current_torque_pos] > 5) {
 
-//        int target = (torque_value-15)*35;
-//
-//        printf("%d ", target);
-//
-//        float error_value = (float) target-target_current;
-//
-//        if(target > 0) {
-//            target_current = MIN(4000, MAX(-1, (
-//                    target_current + error_value * 0.0005
-//            )));
+            int32_t max_torque = torque_values[0];
+            for(int torque_pos = 1; torque_pos < torque_values_size; torque_pos++){
+                if(max_torque < torque_values[torque_pos]){
+                    max_torque = torque_values[torque_pos];
+                }
+            }
+            if(max_torque < 150) {
+                max_torque = 0;
+            }
+            target_current = max_torque*30;
+        } else{
+            target_current = -1;
+        }
+
+//        printf("torque:%d ", torque_values[current_torque_pos]);
+
+//        int target;
+//        if(gpio_input_get() & 0b1) {
+//            target_current = 0;
 //        } else{
-//            target_current = -1;
+//            target_current = 6000;
 //        }
 
-        int target;
-        if(gpio_input_get() & 0b1) {
-            target = 0;
-        } else{
-            target = 6000;
-        }
-        regulate_current(target);
+        regulate_current(target_current);
 
-
-
+        vTaskDelayUntil(&loop_start, pdMS_TO_TICKS(5));
     }
 }
 
 
-void regulate_current(uint32_t target){
+void regulate_current(int32_t target){
     //ziegler nichols: schwingt bei Kp = 0.015
     //periode 70 zyklen
     //kp=0.00675 tn = 59.5 Ki =0.000113
@@ -95,11 +103,13 @@ void regulate_current(uint32_t target){
         output_value = 0;
     }
 
-    printf("p:%f ", p);
-    printf("i:%f ", i);
-    printf("cur:%f ", raw_current/30);
-    printf("target:%d ", target/30);
-    printf("out:%d\n", (uint8_t) output_value);
+//    printf("p:%f ", p);
+//    printf("i:%f ", i);
+//    printf("cur:%f ", raw_current/30);
+//    printf("target:%d ", target/30);
+//    printf("out:%d", (uint8_t) output_value);
+    printf("\n");
+
     dac_output_voltage(DAC_CHANNEL_1, (uint8_t) output_value);
 }
 
@@ -153,7 +163,7 @@ _Noreturn void motor_duty_from_serial(__unused void *pvParameters){
 }
 
 void initialize_motor_control(){
-    xTaskCreate(motor_output_duty, "motor_output_duty", 2048, NULL, 13, &motor_task);
+    xTaskCreate(motor_output_duty, "motor_output_duty", 10000, NULL, 13, &motor_task);
 
     //requires analog_reader to config adc peripheral first
     adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_0);
