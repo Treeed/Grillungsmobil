@@ -49,6 +49,11 @@ _Noreturn void error_handler(__unused void *pvParameters){
             active_errors.shift_in_error = 1;
             xQueueOverwrite(active_errors_queue, &active_errors);
         }
+        if(error.error_type.high_temp){
+            turn_off();
+            active_errors.high_temp = 1;
+            xQueueOverwrite(active_errors_queue, &active_errors);
+        }
 
     }
 }

@@ -9,6 +9,7 @@
 #include <esp_log.h>
 #include <esp_adc_cal.h>
 #include <math.h>
+#include <string.h>
 #include "analog_reader.h"
 #include "spi_controller.h"
 #include "error_handler.h"
@@ -21,6 +22,7 @@ uint32_t calc_battery_voltage(uint32_t adc_val);
 void check_battery_voltage(uint32_t voltage);
 double calc_PTC_temp(uint32_t adc_volt_mv);
 double calc_NTC_temp(uint32_t adc_volt_mv);
+void check_temps(double esc_temp, double buck_temp, double motor_temp);
 
 #define MUX_PIN_BATTERY_VOLT 5
 #define MUX_PIN_ESC_TEMP 6
@@ -60,27 +62,14 @@ _Noreturn void read_analog_mux(void *pvParameters){
 //        printf("volt %d\n", voltage_mv);
         double motor_temp = calc_NTC_temp(voltage_mv);
 
-        if(esc_temp > 80 || buck_temp > 80 || motor_temp > 80){
-            ErrorType active_errors;
-            xQueuePeek(active_errors_queue, &active_errors, portMAX_DELAY);
-            if(!active_errors.battery_empty) {
-                ErrorType error_type = {0};
-                error_type.battery_empty = 1;
-                ErrorStruct error = {
-                        .error_type = error_type,
-                        .error_msg = "temp low"
-                };
-                xQueueSend(error_queue, &error, 0);
-            }
-        }
+        check_temps(esc_temp, buck_temp, motor_temp);
+
 //        printf("bat:%f ", (float) bat_voltage/1000);
 //        printf("esc:%f ",esc_temp);
 //        printf("buck:%f ",buck_temp);
 //        printf("motor:%f\n",motor_temp);
 
         xQueueOverwrite(analog_value_queue, &bat_voltage);
-
-        //esp_adc_cal_raw_to_voltage(avg, &adc_characteristics)
     }
 }
 
@@ -162,6 +151,39 @@ void check_battery_voltage(uint32_t voltage_mv){
         }
     } else{
         battery_empty_cnt = 0;
+    }
+}
+
+void check_temps(double esc_temp, double buck_temp, double motor_temp){
+    static int high_temp_cnt = 0;
+
+    if(esc_temp > 80 || buck_temp > 80 || motor_temp > 80){
+        high_temp_cnt++;
+
+        if (high_temp_cnt > 30) {
+            ErrorType active_errors;
+            xQueuePeek(active_errors_queue, &active_errors, portMAX_DELAY);
+            if (!active_errors.high_temp) {
+                ErrorType error_type = {0};
+                error_type.high_temp = 1;
+                ErrorStruct error = {
+                        .error_type = error_type,
+                        .error_msg = "overtemp condition on "
+                };
+                if (esc_temp > 80){
+                    strcat(error.error_msg, "esc ");
+                }
+                if (buck_temp > 80){
+                    strcat(error.error_msg, "buck ");
+                }
+                if (motor_temp > 80){
+                    strcat(error.error_msg, "motor ");
+                }
+                xQueueSend(error_queue, &error, 0);
+            }
+        }
+    } else{
+        high_temp_cnt = 0;
     }
 }
 
