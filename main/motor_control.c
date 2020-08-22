@@ -108,7 +108,7 @@ void regulate_current(int32_t target){
 //    printf("cur:%f ", raw_current/30);
 //    printf("target:%d ", target/30);
 //    printf("out:%d", (uint8_t) output_value);
-    printf("\n");
+//    printf("\n");
 
     dac_output_voltage(DAC_CHANNEL_1, (uint8_t) output_value);
 }
