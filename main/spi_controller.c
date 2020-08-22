@@ -136,6 +136,7 @@ _Noreturn void shift_in_task(void *pvParameters){
             on_released = xTaskGetTickCount();
         }
         printBits(2, &shift_in_buffer);
+        printf("\n");
     }
 }
 
