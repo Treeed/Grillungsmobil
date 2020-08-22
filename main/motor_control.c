@@ -55,7 +55,7 @@ _Noreturn static void motor_output_duty(__unused void *pvParameters){
                     max_torque = torque_values[torque_pos];
                 }
             }
-            if(max_torque < 150) {
+            if(max_torque < 20) {
                 max_torque = 0;
             }
             target_current = max_torque*30;
