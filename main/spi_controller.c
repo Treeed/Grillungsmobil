@@ -12,6 +12,7 @@
 #include "spi_controller.h"
 #include "tandem_util.h"
 #include "error_handler.h"
+#include "motor_control.h"
 
 spi_device_handle_t shift_out_register_handle;
 spi_device_handle_t shift_in_register_handle;
@@ -29,11 +30,18 @@ typedef struct {
 typedef struct {
     unsigned int unused1 : 3;
     bool on_button : 1;
-    unsigned int unused2 : 6;
+    bool support_pos_5 : 1;
+    bool support_pos_4 : 1;
+    bool support_pos_3 : 1;
+    bool support_pos_2 : 1;
+    unsigned int unused2 : 2;
     uint8_t check_bits : 2;
-    unsigned int unused3 : 4;
+    bool support_pos_1 : 1;
+    bool support_pos_0 : 1;
+    unsigned int unused3 : 2;
 } shift_in_bits;
 
+void process_support_selector_switch(shift_in_bits values);
 
 _Noreturn void shift_out_task(void *pvParameters){
     spi_transaction_t shift_out_transaction = {
@@ -135,9 +143,76 @@ _Noreturn void shift_in_task(void *pvParameters){
             }
             on_released = xTaskGetTickCount();
         }
+
+        process_support_selector_switch(shift_in_buffer);
+
         printBits(2, &shift_in_buffer);
         printf("\n");
     }
+}
+
+void process_support_selector_switch(shift_in_bits values){
+
+    int sum = values.support_pos_0 +
+              values.support_pos_1 +
+              values.support_pos_2 +
+              values.support_pos_3 +
+              values.support_pos_4 +
+              values.support_pos_5;
+    if(sum < 1){
+        return;
+    }
+    if(sum > 1){
+        ErrorType active_errors;
+        xQueuePeek(active_errors_queue, &active_errors, portMAX_DELAY);
+        if(!active_errors.shift_in_error) {
+            ErrorType error_type = {0};
+            error_type.shift_in_error = 1;
+            ErrorStruct error = {
+                    .error_type = error_type,
+                    .error_msg = "more than one switch position is active. shift in was"
+            };
+            strcat(error.error_msg, binString( *((uint16_t *) &values)));
+
+            xQueueSend(error_queue, &error, 0);
+        }
+        return;
+    }
+
+    SupportLevelStruct support_level = {0};
+
+    if(values.support_pos_0){
+        support_level.motor_on = 0;
+        support_level.max_current = 0;
+        support_level.threshold = 0;
+
+    }else if (values.support_pos_1){
+        support_level.motor_on = 1;
+        support_level.max_current = 3000;
+        support_level.threshold = 30;
+
+    }else if (values.support_pos_2){
+        support_level.motor_on = 1;
+        support_level.max_current = 6000;
+        support_level.threshold = 30;
+
+    }else if (values.support_pos_3){
+        support_level.motor_on = 1;
+        support_level.max_current = 9000;
+        support_level.threshold = 30;
+
+    }else if (values.support_pos_4){
+        support_level.motor_on = 0;
+        support_level.max_current = 0;
+        support_level.threshold = 0;
+
+    }else if (values.support_pos_5){
+        support_level.motor_on = 0;
+        support_level.max_current = 0;
+        support_level.threshold = 0;
+
+    }
+    xQueueOverwrite(support_level_queue, &support_level);
 }
 
 void initialize_spi(){
@@ -204,5 +279,5 @@ void initialize_spi(){
 
     shift_out_queue = xQueueCreate(10, 8);
     xTaskCreate(shift_out_task, "shift_out_task", 1024, NULL, 11, NULL);
-    xTaskCreate(shift_in_task, "shift_in_task", 2048, NULL, 10, NULL);
+    xTaskCreate(shift_in_task, "shift_in_task", 4096, NULL, 10, NULL);
 }

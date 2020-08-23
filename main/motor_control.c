@@ -17,6 +17,7 @@
 #include "uart_torque.h"
 
 TaskHandle_t motor_task;
+QueueHandle_t support_level_queue;
 
 void invoke_torque_error();
 
@@ -34,7 +35,7 @@ _Noreturn static void motor_output_duty(__unused void *pvParameters){
     #define torque_values_size 100
     int32_t torque_values[torque_values_size] = {0};
     uint16_t current_torque_pos = 0;
-    int32_t target_current = 0;
+    int32_t target_current;
 
     TickType_t loop_start = xTaskGetTickCount();
     while(1){
@@ -46,8 +47,11 @@ _Noreturn static void motor_output_duty(__unused void *pvParameters){
             invoke_torque_error();
         }
 
+        SupportLevelStruct support_level;
+        xQueuePeek(support_level_queue, &support_level, portMAX_DELAY);
 
-        if(torque_values[current_torque_pos] > 5) {
+
+        if(torque_values[current_torque_pos] > 5 && support_level.motor_on) {
 
             int32_t max_torque = torque_values[0];
             for(int torque_pos = 1; torque_pos < torque_values_size; torque_pos++){
@@ -55,10 +59,10 @@ _Noreturn static void motor_output_duty(__unused void *pvParameters){
                     max_torque = torque_values[torque_pos];
                 }
             }
-            if(max_torque < 20) {
+            if(max_torque < support_level.threshold) {
                 max_torque = 0;
             }
-            target_current = max_torque*30;
+            target_current = max_torque*support_level.max_current/200;
         } else{
             target_current = -1;
         }
@@ -167,6 +171,9 @@ void initialize_motor_control(){
 
     //requires analog_reader to config adc peripheral first
     adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_0);
+
+
+    support_level_queue = xQueueCreate(1, 12);
 
     //debug input
     gpio_config_t in0_config  = {
